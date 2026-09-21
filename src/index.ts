@@ -1,4 +1,4 @@
-import http from 'node:http';
+﻿import http from 'node:http';
 import express from 'express';
 import cors from 'cors';
 import { env } from './env';
@@ -30,7 +30,7 @@ initSockets(server);
 
 server.listen(env.PORT, () => {
   console.log('[server] HTTP + Socket.IO listening on http://localhost:' + env.PORT);
-  console.log('[server] admin-driven mode — no auto timer');
+  console.log('[server] admin-driven mode â€” no auto timer');
 });
 
 async function shutdown(signal: string): Promise<void> {
@@ -42,3 +42,6 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
+
+export default app;
+

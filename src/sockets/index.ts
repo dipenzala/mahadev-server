@@ -172,6 +172,48 @@ export function initSockets(httpServer: HttpServer): Server {
         }
       },
     );
+
+    // ─────────────────────────────────────────────────────
+    // WebRTC Live Video Signaling
+    // ─────────────────────────────────────────────────────
+
+    // Admin -> Player: offer bhejta hai
+    socket.on('webrtc-offer', (data: { offer: unknown; to?: string }) => {
+      console.log('[webrtc] offer from', socket.id, 'to', data.to);
+      socket.broadcast.emit('webrtc-offer', {
+        offer: data.offer,
+        from: socket.id,
+      });
+    });
+
+    // Player -> Admin: answer wapas bhejta hai
+    socket.on('webrtc-answer', (data: { answer: unknown; to?: string }) => {
+      console.log('[webrtc] answer from', socket.id, 'to', data.to);
+      socket.broadcast.emit('webrtc-answer', {
+        answer: data.answer,
+        from: socket.id,
+      });
+    });
+
+    // ICE candidates dono taraf exchange
+    socket.on('webrtc-ice', (data: { candidate: unknown; to?: string }) => {
+      socket.broadcast.emit('webrtc-ice', {
+        candidate: data.candidate,
+        from: socket.id,
+      });
+    });
+
+    // Player ne page join kiya — admin ko batao
+    socket.on('player-joined', () => {
+      console.log('[webrtc] player joined:', socket.id);
+      socket.broadcast.emit('player-joined', { from: socket.id });
+    });
+
+    // Koi bhi disconnect hua — peer cleanup
+    socket.on('disconnect', () => {
+      console.log('[webrtc] disconnected:', socket.id);
+      socket.broadcast.emit('webrtc-peer-disconnected', { from: socket.id });
+    });
   });
 
   roundManager.on('update', () => {

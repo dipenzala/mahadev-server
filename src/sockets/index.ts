@@ -8,13 +8,29 @@ import { prisma } from '../db';
 import type { BetSide } from '../game/types';
 
 export function initSockets(httpServer: HttpServer): Server {
+  console.log('[socket] initializing with CLIENT_ORIGIN:', env.CLIENT_ORIGIN);
+
   const io = new Server(httpServer, {
-    cors: { origin: env.CLIENT_ORIGIN, credentials: true },
+    cors: {
+      origin: (origin, callback) => {
+        // Allow all origins in production temporarily to debug
+        // Later restrict to env.CLIENT_ORIGIN
+        console.log('[socket/cors] origin:', origin);
+        callback(null, true);
+      },
+      credentials: true,
+      methods: ['GET', 'POST'],
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
     const adminToken = socket.handshake.auth?.adminToken as string | undefined;
+
+    console.log('[socket/auth] handshake', socket.id, 'hasToken=', !!token, 'hasAdminToken=', !!adminToken);
 
     // Admin session (from admin panel)
     if (adminToken) {
@@ -23,8 +39,11 @@ export function initSockets(httpServer: HttpServer): Server {
         socket.data.userId = 'admin:' + (session.adminId ?? 'unknown');
         socket.data.username = session.adminUsername ?? 'Admin';
         socket.data.isAdmin = true;
+        console.log('[socket/auth] admin authenticated:', socket.data.userId);
         next();
         return;
+      } else {
+        console.log('[socket/auth] admin token invalid');
       }
     }
 
@@ -33,14 +52,17 @@ export function initSockets(httpServer: HttpServer): Server {
       socket.data.userId = 'anonymous';
       socket.data.username = 'anonymous';
       socket.data.isAdmin = false;
+      console.log('[socket/auth] anonymous connection');
       next();
       return;
     }
+
     try {
       const payload = verifyToken(token);
       socket.data.userId = payload.sub;
       socket.data.username = payload.username;
       socket.data.isAdmin = false;
+      console.log('[socket/auth] user authenticated:', payload.sub, payload.username);
       next();
     } catch (err) {
       console.error('[socket/auth] verify failed:', err);
@@ -177,7 +199,6 @@ export function initSockets(httpServer: HttpServer): Server {
     // WebRTC Live Video Signaling
     // ─────────────────────────────────────────────────────
 
-    // Admin -> Player: offer bhejta hai
     socket.on('webrtc-offer', (data: { offer: unknown; to?: string }) => {
       console.log('[webrtc] offer from', socket.id, 'to', data.to);
       socket.broadcast.emit('webrtc-offer', {
@@ -186,7 +207,6 @@ export function initSockets(httpServer: HttpServer): Server {
       });
     });
 
-    // Player -> Admin: answer wapas bhejta hai
     socket.on('webrtc-answer', (data: { answer: unknown; to?: string }) => {
       console.log('[webrtc] answer from', socket.id, 'to', data.to);
       socket.broadcast.emit('webrtc-answer', {
@@ -195,7 +215,6 @@ export function initSockets(httpServer: HttpServer): Server {
       });
     });
 
-    // ICE candidates dono taraf exchange
     socket.on('webrtc-ice', (data: { candidate: unknown; to?: string }) => {
       socket.broadcast.emit('webrtc-ice', {
         candidate: data.candidate,
@@ -203,15 +222,13 @@ export function initSockets(httpServer: HttpServer): Server {
       });
     });
 
-    // Player ne page join kiya — admin ko batao
     socket.on('player-joined', () => {
       console.log('[webrtc] player joined:', socket.id);
       socket.broadcast.emit('player-joined', { from: socket.id });
     });
 
-    // Koi bhi disconnect hua — peer cleanup
-    socket.on('disconnect', () => {
-      console.log('[webrtc] disconnected:', socket.id);
+    socket.on('disconnect', (reason) => {
+      console.log('[webrtc] disconnected:', socket.id, 'reason:', reason);
       socket.broadcast.emit('webrtc-peer-disconnected', { from: socket.id });
     });
   });

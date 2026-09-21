@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BetSide {
+  ANDAR
+  BAHAR
+}
+
+enum RoundStatus {
+  BETTING
+  DEALING
+  SETTLED
+  CANCELLED
+}
+
+enum TxType {
+  SIGNUP_BONUS
+  BET_PLACED
+  BET_WON
+  BET_REFUND
+  ADMIN_ADJUST
+}
+
+enum UserRole {
+  CLIENT
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  balance      Int      @default(0)
+  blocked      Boolean  @default(false)
+  role         UserRole @default(CLIENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bets         Bet[]
+  transactions Transaction[]
+}
+
+model Round {
+  id        String      @id @default(cuid())
+  roundNo   Int         @unique @default(autoincrement())
+  jokerCard String
+  jokerRank String
+  status    RoundStatus @default(BETTING)
+  winner    BetSide?
+  cards     Json        @default("[]")
+  startedAt DateTime    @default(now())
+  settledAt DateTime?
+
+  bets      Bet[]
+
+  @@index([status])
+}
+
+model Bet {
+  id        String   @id @default(cuid())
+  userId    String
+  roundId   String
+  side      BetSide
+  amount    Int
+  payout    Int      @default(0)
+  settled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@index([roundId])
+  @@index([userId])
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  userId       String
+  type         TxType
+  amount       Int
+  balanceAfter Int
+  meta         Json     @default("{}")
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AdminAction {
+  id             String   @id @default(cuid())
+  adminId        String
+  adminUsername  String
+  targetUserId   String?
+  targetUsername String?
+  action         String
+  beforeValue    Json     @default("{}")
+  afterValue     Json     @default("{}")
+  note           String?
+  createdAt      DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([createdAt])
+}

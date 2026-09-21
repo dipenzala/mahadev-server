@@ -29,7 +29,7 @@ const server = node_http_1.default.createServer(app);
 (0, sockets_1.initSockets)(server);
 server.listen(env_1.env.PORT, () => {
     console.log('[server] HTTP + Socket.IO listening on http://localhost:' + env_1.env.PORT);
-    console.log('[server] admin-driven mode — no auto timer');
+    console.log('[server] admin-driven mode â€” no auto timer');
 });
 async function shutdown(signal) {
     console.log('[server] received ' + signal + ', shutting down');
@@ -39,4 +39,5 @@ async function shutdown(signal) {
 }
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
+exports.default = app;
 //# sourceMappingURL=index.js.map
